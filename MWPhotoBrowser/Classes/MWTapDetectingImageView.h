@@ -12,7 +12,13 @@
 
 @interface MWTapDetectingImageView : UIImageView {
 	id <MWTapDetectingImageViewDelegate> tapDelegate;
+
+    CGPoint startLocation;
+    CGPoint imageStartOrigin;
+    float lastDragPt;
+    bool dragging;
 }
+
 @property (nonatomic, assign) id <MWTapDetectingImageViewDelegate> tapDelegate;
 - (void)handleSingleTap:(UITouch *)touch;
 - (void)handleDoubleTap:(UITouch *)touch;

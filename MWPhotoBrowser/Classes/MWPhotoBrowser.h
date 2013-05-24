@@ -11,6 +11,7 @@
 #import "MWPhoto.h"
 #import "MWPhotoProtocol.h"
 #import "MWCaptionView.h"
+#import "MWTapDetectingImageView.h"
 
 // Debug Logging
 #if 0 // Set to 1 to enable debug logging
@@ -29,10 +30,25 @@
 @end
 
 // MWPhotoBrowser
-@interface MWPhotoBrowser : UIViewController <UIScrollViewDelegate, UIActionSheetDelegate, MFMailComposeViewControllerDelegate> 
+@interface MWPhotoBrowser : UIViewController <UIScrollViewDelegate, UIActionSheetDelegate, MFMailComposeViewControllerDelegate>
+
+
+
+
+// FB Photo Browser
+@property (nonatomic,strong) UIImageView *screenshot;
+@property (nonatomic,strong) UIView *screenshotView;
+@property (nonatomic,strong) UIImageView *entranceImg;
+@property (nonatomic,strong) UIView *entranceImgMask;
+- (void) setTransparentForScreenshot:(float)alpha;
+
+
+
 
 // Properties
 @property (nonatomic) BOOL displayActionButton;
+
+@property (nonatomic, retain) NSArray *photos;
 
 // Init
 - (id)initWithPhotos:(NSArray *)photosArray  __attribute__((deprecated)); // Depreciated
@@ -43,6 +59,9 @@
 
 // Set page that photo browser starts on
 - (void)setInitialPageIndex:(NSUInteger)index;
+
+
+- (UIScrollView *)getPagingScrollView;
 
 @end
 

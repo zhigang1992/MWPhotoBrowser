@@ -11,6 +11,7 @@
 #import "MWZoomingScrollView.h"
 #import "MBProgressHUD.h"
 #import "SDImageCache.h"
+#import "UIView+viewController.h"
 
 #define SYSTEM_VERSION_EQUAL_TO(v)                  ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedSame)
 #define SYSTEM_VERSION_GREATER_THAN(v)              ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedDescending)
@@ -21,6 +22,18 @@
 #define PADDING                 10
 #define PAGE_INDEX_TAG_OFFSET   1000
 #define PAGE_INDEX(page)        ([(page) tag] - PAGE_INDEX_TAG_OFFSET)
+
+
+// FB Photo Browser
+
+#import <QuartzCore/QuartzCore.h>
+
+#define kAnimationDuration 0.3
+#define kBGpushBackRatio 0.92
+#define tagScreenshot 1000
+
+
+
 
 // Private
 @interface MWPhotoBrowser () {
@@ -140,6 +153,11 @@ navigationBarBackgroundImageLandscapePhone = _navigationBarBackgroundImageLandsc
 @synthesize progressHUD = _progressHUD;
 @synthesize previousViewControllerBackButton = _previousViewControllerBackButton;
 
+
+// FB PhotoBrowser
+@synthesize screenshot, entranceImg;
+@synthesize screenshotView, entranceImgMask;
+
 #pragma mark - NSObject
 
 - (id)init {
@@ -234,7 +252,7 @@ navigationBarBackgroundImageLandscapePhone = _navigationBarBackgroundImageLandsc
 	_pagingScrollView.delegate = self;
 	_pagingScrollView.showsHorizontalScrollIndicator = NO;
 	_pagingScrollView.showsVerticalScrollIndicator = NO;
-	_pagingScrollView.backgroundColor = [UIColor blackColor];
+	_pagingScrollView.backgroundColor = [UIColor clearColor];
     _pagingScrollView.contentSize = [self contentSizeForPagingScrollView];
 	[self.view addSubview:_pagingScrollView];
 	
@@ -247,11 +265,42 @@ navigationBarBackgroundImageLandscapePhone = _navigationBarBackgroundImageLandsc
     }
     _toolbar.barStyle = UIBarStyleBlackTranslucent;
     _toolbar.autoresizingMask = UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleWidth;
+    _toolbar.hidden = YES;
     
     // Toolbar Items
     _previousButton = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"MWPhotoBrowser.bundle/images/UIBarButtonItemArrowLeft.png"] style:UIBarButtonItemStylePlain target:self action:@selector(gotoPreviousPage)];
     _nextButton = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"MWPhotoBrowser.bundle/images/UIBarButtonItemArrowRight.png"] style:UIBarButtonItemStylePlain target:self action:@selector(gotoNextPage)];
     _actionButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAction target:self action:@selector(actionButtonPressed:)];
+   
+    
+    
+    
+    
+    // FB Photo Browser
+    [_pagingScrollView setHidden:YES];
+
+    // Offset for screenshot without status bar
+    screenshotView = [[UIView alloc] initWithFrame:screenshot.frame];
+    [screenshotView shiftViewPositionY:20];
+    [screenshot setTag:tagScreenshot];
+    
+    entranceImgMask = [[UIView alloc] initWithFrame:CGRectMake(0, 0, entranceImg.frame.size.width, entranceImg.frame.size.height)];
+    entranceImgMask.backgroundColor = [UIColor blackColor];
+    [self.entranceImg addSubview:entranceImgMask];
+    
+    [self.screenshotView addSubview:screenshot];
+    [self.view insertSubview:screenshotView belowSubview:_pagingScrollView];
+    
+    [self.view insertSubview:entranceImg aboveSubview:screenshot];
+    
+    [self startAnimation];
+
+    
+    
+    
+    
+    
+    
     
     // Update
     [self reloadData];
@@ -260,6 +309,135 @@ navigationBarBackgroundImageLandscapePhone = _navigationBarBackgroundImageLandsc
     [super viewDidLoad];
 	
 }
+
+
+- (void) startAnimation
+{
+    // Calculate new image size and position
+    float scaleRatio = self.view.frame.size.width / entranceImg.image.size.width;
+    float newHeight = scaleRatio * entranceImg.image.size.height;
+    float originCenterY = entranceImg.center.y;
+    
+    [entranceImg setHidden:YES];
+    UIImageView *eImgCopy = [[UIImageView alloc] initWithFrame:entranceImg.frame];
+    eImgCopy.image = entranceImg.image;
+    eImgCopy.contentMode = UIViewContentModeScaleAspectFill;
+    
+    [self.view addSubview:eImgCopy];
+    
+    [UIView animateWithDuration:kAnimationDuration delay:0.0 options:UIViewAnimationOptionCurveLinear animations:^{
+        screenshot.alpha = 0.0;
+        [self pushDownBgView:YES];
+        
+        [eImgCopy setContentMode:UIViewContentModeScaleAspectFill];
+        [eImgCopy setFrame:CGRectMake(0, self.view.frame.size.height / 2 - newHeight / 2, self.view.frame.size.width, newHeight)];
+
+    } completion:^(BOOL finished) {
+        
+        // Bounce animation
+        [self bounceView:eImgCopy distance:(originCenterY - eImgCopy.center.y) completent:^{
+            [eImgCopy removeFromSuperview];
+            [_pagingScrollView setHidden:NO];
+            
+            // Add original image to screenshot
+            [entranceImg shiftViewPositionY:-20];
+            [self.screenshotView addSubview:entranceImg];
+        }];
+        
+    }];
+}
+
+- (void) exitBrowserView:(UIImageView *)currentImg
+{
+    // Clone current image and perform animation
+    UIImageView *tempImg = [[UIImageView alloc] initWithFrame:currentImg.frame];
+    tempImg.contentMode = UIViewContentModeScaleAspectFill;
+    tempImg.image = currentImg.image;
+    tempImg.clipsToBounds = YES;
+    
+    [_pagingScrollView setHidden:YES];
+    currentImg.userInteractionEnabled = NO;
+    
+    [self.view addSubview:tempImg];
+    
+    CGRect tempImgFrame = entranceImg.frame;
+    screenshotView.alpha = 1.0;
+    
+    CGRect outScreenFrame = tempImg.frame;
+    outScreenFrame.origin.y = tempImg.center.y > self.view.frame.size.height / 2 ? self.view.frame.size.height + outScreenFrame.size.height : -outScreenFrame.size.height;
+    
+    if (currentImg.image != entranceImg.image)
+    {
+        
+    } else {
+        tempImgFrame.origin.y += 20;
+    }
+    
+
+    [UIView animateWithDuration:kAnimationDuration delay:0.0 options:UIViewAnimationOptionCurveEaseInOut animations:^{
+        if (currentImg.image == entranceImg.image)
+        {
+            [tempImg setFrame:tempImgFrame];
+        } else {
+            [tempImg setFrame:outScreenFrame];
+        }
+    } completion:^(BOOL finished) {
+        // Back to timeline view when animation ended
+        [self dismissViewControllerAnimated:NO completion:nil];
+    }];
+    
+    [self pushDownBgView:NO];
+
+}
+
+#pragma marks - Animations
+
+- (void) pushDownBgView:(bool)push
+{
+    CABasicAnimation *animation;
+    animation=[CABasicAnimation animationWithKeyPath:@"transform.scale"];
+    animation.delegate = self;
+    animation.duration = kAnimationDuration;
+    animation.repeatCount = 0;
+    animation.removedOnCompletion = FALSE;
+    animation.fillMode = kCAFillModeForwards;
+    animation.fromValue = push ? [NSNumber numberWithFloat:1] : [NSNumber numberWithFloat:kBGpushBackRatio];
+    animation.toValue = push ? [NSNumber numberWithFloat:kBGpushBackRatio] : [NSNumber numberWithFloat:1.0];
+    
+    [screenshotView.layer addAnimation:animation forKey:nil];
+}
+
+- (void) setTransparentForScreenshot:(float)alpha
+{
+    self.screenshot.alpha = alpha;
+    self.entranceImgMask.alpha = 1 - alpha;
+}
+
+- (void) bounceView:(UIView *)view distance:(float)distance completent:(void (^)(void))completion
+{
+    [CATransaction begin]; {
+        [CATransaction setCompletionBlock:^{            
+            completion();
+        }];
+        
+        // Bound photo based on distance
+        CABasicAnimation *animation;
+        animation=[CABasicAnimation animationWithKeyPath:@"transform.translation.y"];
+        animation.delegate = self;
+        animation.duration = kAnimationDuration / 2  ;
+        animation.repeatCount = 0;
+        animation.removedOnCompletion = YES;
+        animation.fillMode = kCAFillModeForwards;
+        animation.autoreverses = YES;
+        animation.fromValue = [NSNumber numberWithFloat:0.0];
+        animation.toValue = [NSNumber numberWithFloat:distance * -0.02];
+        [view.layer addAnimation:animation forKey:@"transform.translation.y"];
+        
+    } [CATransaction commit];    
+}
+
+// Photo Browser ended
+
 
 - (void)performLayout {
     
@@ -571,6 +749,7 @@ navigationBarBackgroundImageLandscapePhone = _navigationBarBackgroundImageLandsc
 }
 
 - (MWCaptionView *)captionViewForPhotoAtIndex:(NSUInteger)index {
+
     MWCaptionView *captionView = nil;
     if ([_delegate respondsToSelector:@selector(photoBrowser:captionViewForPhotoAtIndex:)]) {
         captionView = [_delegate photoBrowser:self captionViewForPhotoAtIndex:index];
@@ -841,7 +1020,13 @@ navigationBarBackgroundImageLandscapePhone = _navigationBarBackgroundImageLandsc
 	if (_currentPageIndex != previousCurrentPage) {
         [self didStartViewingPageAtIndex:index];
     }
-	
+
+    MWPhoto *curPhoto = [_photos objectAtIndex:_currentPageIndex];
+    if ([curPhoto underlyingImage] != entranceImg.image)
+    {
+        [entranceImg setHidden:NO];
+    } else [entranceImg setHidden:YES];
+
 }
 
 - (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView {
@@ -910,7 +1095,7 @@ navigationBarBackgroundImageLandscapePhone = _navigationBarBackgroundImageLandsc
         if ([UIApplication instancesRespondToSelector:@selector(setStatusBarHidden:withAnimation:)]) {
             [[UIApplication sharedApplication] setStatusBarHidden:hidden withAnimation:animated?UIStatusBarAnimationFade:UIStatusBarAnimationNone];
         } else {
-            [[UIApplication sharedApplication] setStatusBarHidden:hidden animated:animated];
+            [[UIApplication sharedApplication] setStatusBarHidden:hidden withAnimation:UIStatusBarAnimationFade];
         }
         
         // Get status bar height if visible
@@ -937,6 +1122,7 @@ navigationBarBackgroundImageLandscapePhone = _navigationBarBackgroundImageLandsc
         [UIView beginAnimations:nil context:nil];
         [UIView setAnimationDuration:0.35];
     }
+    
     CGFloat alpha = hidden ? 0 : 1;
 	[self.navigationController.navigationBar setAlpha:alpha];
 	[_toolbar setAlpha:alpha];
@@ -986,7 +1172,7 @@ navigationBarBackgroundImageLandscapePhone = _navigationBarBackgroundImageLandsc
 #pragma mark - Misc
 
 - (void)doneButtonPressed:(id)sender {
-    [self dismissModalViewControllerAnimated:YES];
+    [self dismissViewControllerAnimated:YES completion:nil];
 }
 
 - (void)actionButtonPressed:(id)sender {
@@ -1136,7 +1322,7 @@ navigationBarBackgroundImageLandscapePhone = _navigationBarBackgroundImageLandsc
         if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
             emailer.modalPresentationStyle = UIModalPresentationPageSheet;
         }
-        [self presentModalViewController:emailer animated:YES];
+        [self presentViewController:emailer animated:YES completion:nil];
         [emailer release];
         [self hideProgressHUD:NO];
     }
@@ -1151,7 +1337,12 @@ navigationBarBackgroundImageLandscapePhone = _navigationBarBackgroundImageLandsc
                                                         delegate:nil cancelButtonTitle:NSLocalizedString(@"Dismiss", nil) otherButtonTitles:nil] autorelease];
 		[alert show];
     }
-	[self dismissModalViewControllerAnimated:YES];
+	[self dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (UIScrollView *)getPagingScrollView
+{
+    return _pagingScrollView;
 }
 
 @end
