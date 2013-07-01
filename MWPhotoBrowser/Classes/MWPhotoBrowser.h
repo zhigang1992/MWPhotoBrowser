@@ -41,7 +41,7 @@
 @property (nonatomic,strong) UIImageView *entranceImg;
 @property (nonatomic,strong) UIView *entranceImgMask;
 - (void) setTransparentForScreenshot:(float)alpha;
-
+- (void) exitBrowserView:(UIImageView *)currentImg;
 
 
 
@@ -60,8 +60,11 @@
 // Set page that photo browser starts on
 - (void)setInitialPageIndex:(NSUInteger)index;
 
+- (void)actionButtonPressed:(id)sender;
 
 - (UIScrollView *)getPagingScrollView;
+
+- (void)hideControlsAfterDelay;
 
 @end
 

@@ -28,7 +28,7 @@
 
 #import <QuartzCore/QuartzCore.h>
 
-#define kAnimationDuration 0.3
+#define kAnimationDuration 0.2
 #define kBGpushBackRatio 0.92
 #define tagScreenshot 1000
 
@@ -162,7 +162,6 @@ navigationBarBackgroundImageLandscapePhone = _navigationBarBackgroundImageLandsc
 
 - (id)init {
     if ((self = [super init])) {
-        
         // Defaults
         self.wantsFullScreenLayout = YES;
         self.hidesBottomBarWhenPushed = YES;
@@ -188,7 +187,11 @@ navigationBarBackgroundImageLandscapePhone = _navigationBarBackgroundImageLandsc
 
 - (id)initWithDelegate:(id <MWPhotoBrowserDelegate>)delegate {
     if ((self = [self init])) {
-        _delegate = delegate;
+        if (!delegate) {
+            _delegate = (id<MWPhotoBrowserDelegate>)self;
+        } else {
+            _delegate = delegate;
+        }
 	}
 	return self;
 }
@@ -251,6 +254,7 @@ navigationBarBackgroundImageLandscapePhone = _navigationBarBackgroundImageLandsc
 	_pagingScrollView.pagingEnabled = YES;
 	_pagingScrollView.delegate = self;
 	_pagingScrollView.showsHorizontalScrollIndicator = NO;
+    _pagingScrollView.delaysContentTouches = NO;
 	_pagingScrollView.showsVerticalScrollIndicator = NO;
 	_pagingScrollView.backgroundColor = [UIColor clearColor];
     _pagingScrollView.contentSize = [self contentSizeForPagingScrollView];
@@ -319,19 +323,29 @@ navigationBarBackgroundImageLandscapePhone = _navigationBarBackgroundImageLandsc
     float originCenterY = entranceImg.center.y;
     
     [entranceImg setHidden:YES];
-    UIImageView *eImgCopy = [[UIImageView alloc] initWithFrame:entranceImg.frame];
-    eImgCopy.image = entranceImg.image;
+    UIImageView *eImgCopy = [[UIImageView alloc] initWithImage:entranceImg.image];
+    eImgCopy.frame = entranceImg.frame;
     eImgCopy.contentMode = UIViewContentModeScaleAspectFill;
-    
+    eImgCopy.clipsToBounds = YES;
     [self.view addSubview:eImgCopy];
     
-    [UIView animateWithDuration:kAnimationDuration delay:0.0 options:UIViewAnimationOptionCurveLinear animations:^{
+    CGSize imageSize = entranceImg.image.size;
+    CGSize viewBoundsSize = self.view.bounds.size;
+    
+    if (imageSize.width > viewBoundsSize.width) {
+        imageSize.height = imageSize.height * viewBoundsSize.width / imageSize.width;
+        imageSize.width = viewBoundsSize.width;
+    }
+    
+    if (imageSize.height > viewBoundsSize.height) {
+        imageSize.width =  imageSize.width * viewBoundsSize.height / imageSize.height;
+        imageSize.height = viewBoundsSize.height;
+    }
+    
+    [UIView animateWithDuration:kAnimationDuration delay:0.0 options:UIViewAnimationOptionCurveEaseInOut animations:^{
         screenshot.alpha = 0.0;
         [self pushDownBgView:YES];
-        
-        [eImgCopy setContentMode:UIViewContentModeScaleAspectFill];
-        [eImgCopy setFrame:CGRectMake(0, self.view.frame.size.height / 2 - newHeight / 2, self.view.frame.size.width, newHeight)];
-
+        [eImgCopy setFrame:CGRectMake((viewBoundsSize.width-imageSize.width)/2.f, (viewBoundsSize.height-imageSize.height)/2.f, imageSize.width, imageSize.height)];
     } completion:^(BOOL finished) {
         
         // Bounce animation
@@ -381,6 +395,7 @@ navigationBarBackgroundImageLandscapePhone = _navigationBarBackgroundImageLandsc
         } else {
             [tempImg setFrame:outScreenFrame];
         }
+        [self setTransparentForScreenshot:1.f];
     } completion:^(BOOL finished) {
         // Back to timeline view when animation ended
         [self dismissViewControllerAnimated:NO completion:nil];
@@ -1149,7 +1164,7 @@ navigationBarBackgroundImageLandscapePhone = _navigationBarBackgroundImageLandsc
 - (void)hideControlsAfterDelay {
 	if (![self areControlsHidden]) {
         [self cancelControlHiding];
-		_controlVisibilityTimer = [[NSTimer scheduledTimerWithTimeInterval:5 target:self selector:@selector(hideControls) userInfo:nil repeats:NO] retain];
+		_controlVisibilityTimer = [[NSTimer scheduledTimerWithTimeInterval:2 target:self selector:@selector(hideControls) userInfo:nil repeats:NO] retain];
 	}
 }
 

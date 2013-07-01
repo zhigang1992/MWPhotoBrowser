@@ -19,23 +19,30 @@
 
 - (id)initWithFrame:(CGRect)frame {
 	if ((self = [super initWithFrame:frame])) {
-		self.userInteractionEnabled = YES;
+		[self setupDetectingImageView];
 	}
 	return self;
 }
 
 - (id)initWithImage:(UIImage *)image {
 	if ((self = [super initWithImage:image])) {
-		self.userInteractionEnabled = YES;
+		[self setupDetectingImageView];
 	}
 	return self;
 }
 
 - (id)initWithImage:(UIImage *)image highlightedImage:(UIImage *)highlightedImage {
 	if ((self = [super initWithImage:image highlightedImage:highlightedImage])) {
-		self.userInteractionEnabled = YES;
+		[self setupDetectingImageView];
 	}
 	return self;
+}
+
+- (void)setupDetectingImageView{
+    self.userInteractionEnabled = YES;
+    UILongPressGestureRecognizer *longGesture = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)];
+    longGesture.minimumPressDuration = 0.4;
+    [self addGestureRecognizer:longGesture];
 }
 
 - (UIViewController*)viewController
@@ -76,21 +83,26 @@
     
     // Calculate the drag distance
     float newY = imageStartOrigin.y - ((float)startLocation.y - (float)pt.y);
-    float dY = newY - imageStartOrigin.y;
-    
-    // Bound drag distance and change alpha of background
-    if (fabsf(dY) > self.frame.size.height / 4)
-    {
-        dY = self.frame.size.height / 4;
-    }
-    
-    float newAlpha = fabsf(dY) / (self.frame.size.height / 2);
-    
-    [(MWPhotoBrowser *)[self firstAvailableUIViewController] setTransparentForScreenshot:newAlpha - 0.2];
     
     // Get new location to image
     frame.origin.y = newY;
     [self setFrame:frame];
+    
+    
+    float dY = fabsf(newY - imageStartOrigin.y);
+    
+    CGFloat height = [self firstAvailableUIViewController].view.frame.size.height;
+    
+    CGFloat endPoint = 0.25 * height;
+    
+    if (dY > endPoint) {
+        dY = endPoint;
+    }
+    
+    float newAlpha = dY / endPoint * 0.3;
+    
+    [(MWPhotoBrowser *)[self firstAvailableUIViewController] setTransparentForScreenshot:newAlpha];
+    
 }
 
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
@@ -138,9 +150,10 @@
     }
     
 	switch (tapCount) {
-		case 1:
+		case 1:{
 			[self handleSingleTap:touch];
 			break;
+        }
 		case 2:
 			[self handleDoubleTap:touch];
 			break;
@@ -166,6 +179,14 @@
 - (void)handleTripleTap:(UITouch *)touch {
 	if ([tapDelegate respondsToSelector:@selector(imageView:tripleTapDetected:)])
 		[tapDelegate imageView:self tripleTapDetected:touch];
+}
+
+- (void)handleLongPress:(UILongPressGestureRecognizer *)gesture{
+    if (gesture.state == UIGestureRecognizerStateBegan) {
+        if ([tapDelegate respondsToSelector:@selector(imageView:longPressDetected:)]) {
+            [tapDelegate imageView:self longPressDetected:gesture];
+        }
+    }
 }
 
 @end

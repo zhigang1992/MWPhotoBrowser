@@ -271,11 +271,16 @@
 }
 
 // Image View
-- (void)imageView:(UIImageView *)imageView singleTapDetected:(UITouch *)touch { 
+- (void)imageView:(UIImageView *)imageView singleTapDetected:(UITouch *)touch {
+    [_photoBrowser performSelector:@selector(exitBrowserView:) withObject:imageView];
     [self handleSingleTap:[touch locationInView:imageView]];
 }
 - (void)imageView:(UIImageView *)imageView doubleTapDetected:(UITouch *)touch {
     [self handleDoubleTap:[touch locationInView:imageView]];
+}
+
+- (void)imageView:(UIImageView *)imageView longPressDetected:(UIGestureRecognizer *)gesture{
+    [_photoBrowser actionButtonPressed:nil];
 }
 
 // Background View
